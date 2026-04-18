@@ -1,0 +1,1 @@
+# Queue → process docs → chunk → embed → store
