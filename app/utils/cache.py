@@ -1,12 +1,18 @@
 import redis 
 import json
-from app.config.settings import REDIS_HOST,REDIS_PORT
+from app.config.settings import REDIS_URL
 
-redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True, db=0)
+redis_client = redis.from_url(REDIS_URL, decode_responses=True)
 
 def get_cache(key):
-    value = redis_client.get(key)
-    return json.loads(value) if value else None
+    try:
+        value = redis_client.get(key)
+        return json.loads(value) if value else None
+    except Exception:
+        return None
 
 def set_cache(key, value):
-    redis_client.set(key, json.dumps(value), ex=3600)
+    try:
+        redis_client.set(key, json.dumps(value), ex=3600)
+    except Exception:
+        pass

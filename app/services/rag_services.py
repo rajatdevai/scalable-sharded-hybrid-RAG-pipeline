@@ -1,9 +1,7 @@
 from app.utils.embedding import embed_batch
 from app.utils.cache import get_cache, set_cache
-from app.utils.reranker import rerank
 from app.services.retriever import hybrid_retrieve
 from app.utils.llm import generate_response
-from app.config.settings import FINAL_K
 
 def rag_pipeline(query):
 
@@ -15,20 +13,28 @@ def rag_pipeline(query):
     # 2. Embed query
     query_vec = embed_batch([query])[0]
 
-    # 3. Retrieve
-    shards = ["hr_leave", "hr_salary", "hr_general"]
-    docs = hybrid_retrieve(query, shards, query_vec, docs_per_shard=10)
+    # 3. Retrieve & Re-rank
+    # Note: hybrid_retrieve now handles dynamic shard selection using AI
+    context_docs = hybrid_retrieve(query, query_vec, docs_per_shard=10)
 
-    # 4. Re-rank
-    reranked = rerank(query, docs)
+    # 4. Generate final answer
+    if not context_docs:
+        context_str = "No relevant documents found."
+    else:
+        context_str = "\n".join(context_docs)
 
-    # 5. Generate final answer
-    prompt = f"""Context: {reranked}
-    Question: {query}
-    Answer:"""
+
+    prompt = f"""Use the following pieces of context to answer the question at the end. 
+Keep the answer concise and professional.
+
+Context:
+{context_str}
+
+Question: {query}
+Answer:"""
 
     final_answer = generate_response(prompt)
 
-    # 6. Cache and return
+    # 5. Cache and return
     set_cache(query, final_answer)
-    return final_answer
+    return final_answer
