@@ -19,18 +19,25 @@ def load_or_create_index(shard_name):
     path = os.path.join(FAISS_PATH, f"{shard_name}.index")
     meta_path = get_metadata_path(shard_name)
 
-    if os.path.exists(path):
-        index = faiss.read_index(path)
-        if os.path.exists(meta_path):
-            with open(meta_path, "r", encoding="utf-8") as f:
-                documents[shard_name] = json.load(f)
-        else:
+    # Safety check: exists AND is not empty
+    if os.path.exists(path) and os.path.getsize(path) > 0:
+        try:
+            index = faiss.read_index(path)
+            if os.path.exists(meta_path):
+                with open(meta_path, "r", encoding="utf-8") as f:
+                    documents[shard_name] = json.load(f)
+            else:
+                documents[shard_name] = []
+        except Exception as e:
+            print(f"Index corrupted for {shard_name}, creating new. Error: {e}")
+            index = faiss.IndexFlatL2(dimension)
             documents[shard_name] = []
     else:
         index = faiss.IndexFlatL2(dimension)
         documents[shard_name] = []
 
     indexes[shard_name] = index
+
 
 def add_documents(shard_name, vectors, docs):
     if shard_name not in indexes:
